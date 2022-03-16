@@ -1,0 +1,128 @@
+# Importation des librairies
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+# Importation des bases année 2005
+df_vehicules = pd.read_csv(r"C:\Accidents\données\2005\vehicules_2005.csv", encoding = "latin-1")
+df_usagers = pd.read_csv(r"C:\Accidents\données\2005\usagers_2005.csv", encoding = "latin-1")
+df_lieux = pd.read_csv(r"C:\Accidents\données\2005\lieux_2005.csv", encoding = "latin-1")
+df_caract = pd.read_csv(r"C:\Accidents\données\2005\caracteristiques_2005.csv", encoding = "latin-1")
+
+# Importation des années 2006 à 2018
+for i in range(2006,2019,1) :
+    df_lieux = pd.concat([df_lieux, pd.read_csv(r'C:\Accidents\données\tout\lieux_' + str(i) + '.csv')], axis=0)
+    df_usagers = pd.concat([df_usagers, pd.read_csv(r'C:\Accidents\données\tout\usagers_' + str(i) + '.csv')], axis=0)
+    df_vehicules = pd.concat([df_vehicules, pd.read_csv(r'C:\Accidents\données\tout\vehicules_' + str(i) + '.csv')], axis=0)
+    try : 
+        df_caract = pd.concat([df_caract, pd.read_csv(r'C:\Accidents\données\tout\caracteristiques_' + str(i) + '.csv', encoding='latin-1')], axis=0)
+    except :
+        df_caract = pd.concat([df_caract, pd.read_csv(r'C:\Accidents\données\tout\caracteristiques_' + str(i) + '.csv', encoding='latin-1', sep = '\t')], axis=0)
+        
+# Nettoyage
+# création d'une fonction pour supprimer les 0 des départements
+def remove_last_zero(x):
+    if (x[-1] != "A") and (x[-1] != "B") :
+        x = x[:-1]
+    return x
+
+# On supprime les caractères unicodes de la colonne 'v2'
+df_lieux['v2'] = df_lieux['v2'].replace('', '')
+
+# On remplace les codes de la Corse
+df_caract['dep'] = df_caract['dep'].replace([201, 202], ["2A", "2B"])
+# On passe les dep en str
+df_caract['dep'] = df_caract['dep'].astype(str)
+# On applique la fonction pour supprimer les 0 des dep
+df_caract['dep'] = df_caract['dep'].apply(remove_last_zero)
+# On supprime les deux derniers caractères de la commune (0.1)
+df_caract['com'] = df_caract['com'].astype(str).str[:-2]
+# On ajoute des 0 pour les départements contenant seulement un chiffre
+df_caract['dep'] = df_caract['dep'].astype(str).str.zfill(2)
+# On ajoute des 0 pour les communes contenant seulement un ou deux chiffres
+df_caract['com'] = df_caract['com'].astype(str).str.zfill(3)
+# On crée une colonne 'com_insee' avec le code Insee créé
+df_caract['com_insee'] = df_caract['dep'] + df_caract['com']
+df_caract['com_insee'] = df_caract['com_insee'].astype(str)
+# On harmonise la colonne hrmn
+df_caract['hrmn'] = df_caract['hrmn'].astype(str).str.zfill(4)
+df_caract['hrmn'] = df_caract['hrmn'].astype(str).str[:2] + ':' + df_caract['hrmn'].astype(str).str[2:]
+
+# On modifie l'écriture de l'année (colonne 'an')
+df_caract['an'] = df_caract['an'].replace([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+                                        [2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018])
+
+# On convertit les latitudes et longitudes en numérique
+df_caract['long'] = df_caract['long'].apply(pd.to_numeric, errors='coerce')
+df_caract['lat'] = df_caract['lat'].apply(pd.to_numeric, errors='coerce')
+
+# On remplace les codes Insee des arrondissements par le code de Paris en général
+df_caract['com_insee'] = df_caract['com_insee'].replace(['75101', '75102', '75103', '75104', '75105', '75106', '75107',
+                                '75108', '75109', '75110', '75111', '75112', '75113', '75114',
+                                '75115', '75116', '75117', '75118', '75119', '75120'], '75056')
+# On remplace les codes Insee des arrondissements par le code de Lyon en général
+df_caract['com_insee'] = df_caract['com_insee'].replace(['69381', '69382', '69383', '69384', '69385', '69386', '69387',
+                                '69388', '69389'], '69123')
+# On remplace les codes Insee des arrondissements par le code de Marseille en général
+df_caract['com_insee'] = df_caract['com_insee'].replace(['13201', '13207', '13202', '13203', '13204', '13205', '13206',
+                                '13208', '13209', '13210', '13211', '13212', '13213', '13214', '13215', '13216'], '13055')
+                                
+# Importation et nettoyage des années 2019 et 2020
+df_caract_2019 = pd.read_csv(r"C:\Accidents\données\2019\caracteristiques-2019.csv", encoding = "ISO-8859-1", sep=";")
+df_lieux_2019 = pd.read_csv(r"C:\Accidents\données\2019\lieux-2019.csv", encoding = "ISO-8859-1", low_memory=False, sep=";")
+df_caract_lieux_2019 = pd.merge(df_caract_2019, df_lieux_2019)
+df_usagers_2019 = pd.read_csv(r"C:\Accidents\données\2019\usagers-2019.csv", sep=";")
+df_vehicules_2019 = pd.read_csv(r"C:\Accidents\données\2019\vehicules-2019.csv", encoding = "utf-8-sig", sep=";")
+df_usagers_vehicules_2019 = pd.merge(df_usagers_2019, df_vehicules_2019, how='left', on=["Num_Acc", "num_veh"])
+df_2019 = pd.merge(df_usagers_vehicules_2019, df_caract_lieux_2019, how="left", on="Num_Acc")
+df_2019['com'] = df_2019['com'].astype(str)
+# On remplit les NaN avec des empty string
+df_2019 = df_2019.replace(np.nan, '', regex=True)
+df_2019.rename(columns = {'com' : 'com_insee'}, inplace = True)
+
+df_caract_2020 = pd.read_csv(r"C:\Accidents\données\2020\caracteristiques-2020.csv", encoding = "ISO-8859-1", sep=";")
+df_lieux_2020 = pd.read_csv(r"C:\Accidents\données\2020\lieux-2020.csv", encoding = "ISO-8859-1", low_memory=False, sep=";")
+df_caract_lieux_2020 = pd.merge(df_caract_2020, df_lieux_2020)
+df_usagers_2020 = pd.read_csv(r"C:\Accidents\données\2020\usagers-2020.csv", sep=";")
+df_vehicules_2020 = pd.read_csv(r"C:\Accidents\données\2020\vehicules-2020.csv", encoding = "utf-8-sig", sep=";")
+df_usagers_vehicules_2020 = pd.merge(df_usagers_2020, df_vehicules_2020, how='left', on=["Num_Acc", "num_veh"])
+df_2020 = pd.merge(df_usagers_vehicules_2020, df_caract_lieux_2020, how="left", on="Num_Acc")
+df_2020['com'] = df_2020['com'].astype(str)
+# On remplit les NaN avec des empty string
+df_2020 = df_2020.replace(np.nan, '', regex=True)
+df_2020.rename(columns = {'com' : 'com_insee'}, inplace = True)
+
+df_caract_2019_2020 = pd.concat([df_caract_2019, df_caract_2020], ignore_index=True)
+df_lieux_2019_2020 = pd.concat([df_lieux_2019, df_lieux_2020], ignore_index=True)
+df_usagers_2019_2020 = pd.concat([df_usagers_2019, df_usagers_2020], ignore_index=True)
+df_vehicules_2019_2020 = pd.concat([df_vehicules_2019, df_vehicules_2020], ignore_index=True)
+# On renomme la colonne 'com' en 'com_insee'
+df_caract_2019_2020.rename(columns = {'com' : 'com_insee'}, inplace = True)
+
+# On remplace les codes Insee des arrondissements par le code de Paris en général
+df_caract_2019_2020['com_insee'] = df_caract_2019_2020['com_insee'].replace(['75101', '75102', '75103', '75104', '75105', '75106', '75107',
+                                '75108', '75109', '75110', '75111', '75112', '75113', '75114',
+                                '75115', '75116', '75117', '75118', '75119', '75120'], '75056')
+# On remplace les codes Insee des arrondissements par le code de Lyon en général
+df_caract_2019_2020['com_insee'] = df_caract_2019_2020['com_insee'].replace(['69381', '69382', '69383', '69384', '69385', '69386', '69387',
+                                '69388', '69389'], '69123')
+# On remplace les codes Insee des arrondissements par le code de Marseille en général
+df_caract_2019_2020['com_insee'] = df_caract_2019_2020['com_insee'].replace(['13201', '13207', '13202', '13203', '13204', '13205', '13206',
+                                '13208', '13209', '13210', '13211', '13212', '13213', '13214', '13215', '13216'], '13055')
+                                
+# Concaténation de toutes les tables
+df_caract = pd.concat([df_caract, df_caract_2019_2020], ignore_index=True)
+df_lieux = pd.concat([df_lieux, df_lieux_2019_2020], ignore_index=True)
+df_usagers = pd.concat([df_usagers, df_usagers_2019_2020], ignore_index=True)
+df_vehicules = pd.concat([df_vehicules, df_vehicules_2019_2020], ignore_index=True)
+
+# On ajoute des 0 pour les départements contenant seulement un chiffre
+df_caract['dep'] = df_caract['dep'].astype(str).str.zfill(2)
+
+# On passe la colonne 'date' en format 'datetime'
+df_caract['date'] = pd.to_datetime(df_caract['jour'].astype(str) + '-' + df_caract['mois'].astype(str)
+                                    + '-' + df_caract['an'].astype(str), format='%d-%m-%Y')
+
+# On crée une colonne avec le jour de la semaine (lundi = 0, dimanche = 6)
+df_caract['jour_semaine'] = df_caract['date'].dt.dayofweek
